@@ -1,0 +1,151 @@
+openapi: 3.1.0
+info:
+  title: Baymax Core Actions
+  version: "1.0.0"
+servers:
+  - url: https://REPLACE-ME-WITH-YOUR-DOMAIN
+paths:
+  /triage-assess:
+    post:
+      operationId: triage_assess
+      summary: Classify symptoms into self-care, urgent care, or emergency with red-flag reasons.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriageInput'
+      responses:
+        "200":
+          description: Triage decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriageResult'
+  /drug-interactions:
+    post:
+      operationId: drug_interactions_check
+      summary: Check for drug–drug interactions using RxNorm IDs (or names if IDs unknown).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DDICheckInput'
+      responses:
+        "200":
+          description: Interaction results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DDICheckResult'
+  /education-leaflet:
+    get:
+      operationId: education_leaflet
+      summary: Plain-language leaflet for a condition, symptom, or medication.
+      parameters:
+        - in: query
+          name: topic
+          required: true
+          schema: { type: string }
+        - in: query
+          name: reading_level
+          schema: { type: string, enum: ["basic","standard"], default: "basic" }
+      responses:
+        "200":
+          description: Leaflet text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Leaflet'
+  /end-session:
+    post:
+      operationId: end_session
+      summary: End a care session ONLY after the user states 'I am satisfied with my care'.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EndSessionInput'
+      responses:
+        "200":
+          description: End result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndSessionResult'
+
+components:
+  schemas:
+    TriageInput:
+      type: object
+      properties:
+        age: { type: integer, minimum: 0 }
+        symptoms: { type: array, items: { type: string }, minItems: 1 }
+        duration_hours: { type: number, minimum: 0 }
+        vitals:
+          type: object
+          properties:
+            hr: { type: number }
+            temp_c: { type: number }
+            sbp: { type: number }
+            spo2: { type: number }
+        allergies: { type: array, items: { type: string } }
+      required: [symptoms]
+    TriageResult:
+      type: object
+      properties:
+        level: { type: string, enum: [self_care, urgent_care, emergency] }
+        red_flags: { type: array, items: { type: string } }
+        recommendation: { type: string }
+        self_care_instructions: { type: string, nullable: true }
+        follow_up_hours: { type: integer }
+      required: [level, recommendation]
+    DDICheckInput:
+      type: object
+      properties:
+        rxnorm_ids: { type: array, items: { type: string } }
+        fallback_names: { type: array, items: { type: string } }
+      required: [rxnorm_ids]
+    DDICheckResult:
+      type: object
+      properties:
+        interactions:
+          type: array
+          items:
+            type: object
+            properties:
+              pair: { type: array, items: { type: string }, minItems: 2, maxItems: 2 }
+              severity: { type: string, enum: [minor, moderate, major, contraindicated, unknown] }
+              mechanism: { type: string }
+              recommendation: { type: string }
+            required: [pair, severity, recommendation]
+        unknown_names: { type: array, items: { type: string } }
+      required: [interactions]
+    Leaflet:
+      type: object
+      properties:
+        title: { type: string }
+        reading_level: { type: string, enum: ["basic","standard"] }
+        text: { type: string }
+        key_points: { type: array, items: { type: string } }
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              url: { type: string }
+      required: [title, text]
+    EndSessionInput:
+      type: object
+      properties:
+        user_phrase: { type: string }
+      required: [user_phrase]
+    EndSessionResult:
+      type: object
+      properties:
+        ended: { type: boolean }
+        message: { type: string }
+      required: [ended, message]
